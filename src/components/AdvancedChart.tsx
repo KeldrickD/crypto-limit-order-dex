@@ -298,8 +298,8 @@ const calculateADX = (data: ChartData[], period: number = 14): Array<{
 
 export default function AdvancedChart({
   data: initialData,
-  width,
-  height,
+  width = 800,
+  height = 400,
   onZoom,
   onPan,
   onError,
@@ -320,6 +320,7 @@ export default function AdvancedChart({
     Stochastic: { period: 14, smoothK: 3, smoothD: 3 },
     ADX: { period: 14 },
   });
+  const [previewParams, setPreviewParams] = useState<IndicatorParams | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [dragState, setDragState] = useState<DragState>({
     isDragging: false,
@@ -546,7 +547,7 @@ export default function AdvancedChart({
     setZoomDomain(null);
   }, []);
 
-  const calculateIndicators = (data: ChartData[], params: IndicatorParams) => {
+  const calculateIndicators = useCallback((data: ChartData[], params: IndicatorParams) => {
     const updatedData = data.map(point => {
       const newPoint = { ...point };
       
@@ -624,13 +625,26 @@ export default function AdvancedChart({
       return newPoint;
     });
 
+    return updatedData;
+  }, []);
+
+  useEffect(() => {
+    const params = previewParams || indicatorParams;
+    const updatedData = calculateIndicators(
+      chartData.map(d => ({ ...d })), // Create a fresh copy of the data
+      params
+    );
     setChartData(updatedData);
-  };
+  }, [calculateIndicators, indicatorParams, previewParams, initialData]);
 
   const handleIndicatorParamsChange = (newParams: IndicatorParams) => {
     setIndicatorParams(newParams);
-    calculateIndicators(chartData, newParams);
+    setPreviewParams(null); // Clear preview when applying changes
   };
+
+  const handlePreview = useCallback((previewParams: IndicatorParams) => {
+    setPreviewParams(previewParams);
+  }, []);
 
   const renderCandlestick = () => {
     return (
@@ -923,10 +937,14 @@ export default function AdvancedChart({
 
       <IndicatorSettings
         isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
+        onClose={() => {
+          setIsSettingsOpen(false);
+          setPreviewParams(null); // Clear preview when closing
+        }}
         activeIndicators={activeIndicators}
         params={indicatorParams}
         onChange={handleIndicatorParamsChange}
+        onPreview={handlePreview}
       />
     </div>
   );
