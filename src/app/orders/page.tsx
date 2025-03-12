@@ -1,7 +1,7 @@
 import Header from '@/components/Header';
-import OrderForm from '@/components/OrderForm';
+import OrderList from '@/components/OrderList';
 
-export default function Home() {
+export default function OrdersPage() {
   return (
     <main className="min-h-screen bg-gray-50">
       <Header />
@@ -9,12 +9,12 @@ export default function Home() {
         <div className="px-4 py-6 sm:px-0">
           <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6">
             <h1 className="text-3xl font-bold text-gray-900 mb-6">
-              Create Limit Order
+              My Orders
             </h1>
-            <OrderForm />
+            <OrderList />
           </div>
         </div>
       </div>
     </main>
   );
-}
+} 
