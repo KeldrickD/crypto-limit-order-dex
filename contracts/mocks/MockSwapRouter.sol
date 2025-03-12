@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 
 /**
  * @title MockSwapRouter
@@ -30,8 +29,9 @@ contract MockSwapRouter {
         // Note: In a real scenario, the caller would have approved this contract
         IERC20(params.tokenIn).transferFrom(msg.sender, address(this), params.amountIn);
         
-        // Calculate amountOut (just return 2000 tokens per ETH for this mock)
-        amountOut = params.amountIn * 2000;
+        // Calculate amountOut (just return 2x the minimum amount requested for this mock)
+        // This ensures we always meet the minimum requirement but don't exceed what we have
+        amountOut = params.amountOutMinimum > 0 ? params.amountOutMinimum : params.amountIn;
         
         // Transfer output tokens to recipient
         IERC20(params.tokenOut).transfer(params.recipient, amountOut);

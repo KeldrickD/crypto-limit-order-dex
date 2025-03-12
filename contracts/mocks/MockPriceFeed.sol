@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import "../interfaces/IMockPriceFeed.sol";
 
 /**
  * @title MockPriceFeed
  * @dev Mock Chainlink price feed for testing
  */
-contract MockPriceFeed is AggregatorV3Interface {
+contract MockPriceFeed is IMockPriceFeed {
     int256 private _latestAnswer;
     uint8 private _decimals = 8;
     string private _description = "Mock Price Feed";
     uint256 private _version = 1;
     mapping(address => int256) private _tokenPrices;
+    
+    // Track which token this price feed is for in the current context
+    address private _currentQueryToken;
 
     /**
      * @dev Set the latest answer (price)
@@ -32,6 +36,50 @@ contract MockPriceFeed is AggregatorV3Interface {
     }
 
     /**
+     * @dev Set the token for the current query context
+     * @param token Token address to query price for
+     */
+    function setQueryToken(address token) external {
+        _currentQueryToken = token;
+    }
+    
+    /**
+     * @dev Get the token price for a specific token
+     * @param token Token address
+     * @return price The price for the token
+     */
+    function getTokenPrice(address token) external view returns (int256) {
+        return _tokenPrices[token];
+    }
+    
+    /**
+     * @dev Get the latest round data for a specific token
+     * @param token Token address
+     * @return roundId The round ID
+     * @return answer The price
+     * @return startedAt When the round started
+     * @return updatedAt When the round was updated
+     * @return answeredInRound The round ID in which the answer was computed
+     */
+    function latestRoundDataForToken(address token) external view returns (
+        uint80 roundId,
+        int256 answer,
+        uint256 startedAt,
+        uint256 updatedAt,
+        uint80 answeredInRound
+    ) {
+        int256 price = _tokenPrices[token];
+        
+        return (
+            1,              // roundId
+            price,          // answer
+            block.timestamp - 1 hours,  // startedAt
+            block.timestamp,           // updatedAt
+            1               // answeredInRound
+        );
+    }
+
+    /**
      * @dev Get the latest round data
      * @return roundId The round ID
      * @return answer The price
@@ -46,9 +94,17 @@ contract MockPriceFeed is AggregatorV3Interface {
         uint256 updatedAt,
         uint80 answeredInRound
     ) {
+        // Use the token price if we have it, otherwise use the default
+        int256 price;
+        if (_currentQueryToken != address(0) && _tokenPrices[_currentQueryToken] != 0) {
+            price = _tokenPrices[_currentQueryToken];
+        } else {
+            price = _latestAnswer;
+        }
+        
         return (
             1,              // roundId
-            _latestAnswer,  // answer
+            price,          // answer
             block.timestamp - 1 hours,  // startedAt
             block.timestamp,           // updatedAt
             1               // answeredInRound
@@ -95,9 +151,17 @@ contract MockPriceFeed is AggregatorV3Interface {
         uint256 updatedAt,
         uint80 answeredInRound
     ) {
+        // Use the token price if we have it, otherwise use the default
+        int256 price;
+        if (_currentQueryToken != address(0) && _tokenPrices[_currentQueryToken] != 0) {
+            price = _tokenPrices[_currentQueryToken];
+        } else {
+            price = _latestAnswer;
+        }
+        
         return (
             _roundId,       // roundId
-            _latestAnswer,  // answer
+            price,          // answer
             block.timestamp - 1 hours,  // startedAt
             block.timestamp,           // updatedAt
             _roundId        // answeredInRound

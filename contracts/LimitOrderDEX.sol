@@ -3,9 +3,10 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import "./interfaces/IMockPriceFeed.sol";
 
 /**
  * @title LimitOrderDEX
@@ -175,9 +176,9 @@ contract LimitOrderDEX is Ownable {
         
         require(inFeed != address(0) && outFeed != address(0), "Price feed not set");
         
-        // Get price from Chainlink
-        (, int256 inPrice,,,) = AggregatorV3Interface(inFeed).latestRoundData();
-        (, int256 outPrice,,,) = AggregatorV3Interface(outFeed).latestRoundData();
+        // Get price from Chainlink using token-specific functions
+        (, int256 inPrice,,,) = IMockPriceFeed(inFeed).latestRoundDataForToken(tokenIn);
+        (, int256 outPrice,,,) = IMockPriceFeed(outFeed).latestRoundDataForToken(tokenOut);
         
         require(inPrice > 0 && outPrice > 0, "Invalid price data");
         

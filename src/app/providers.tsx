@@ -1,48 +1,48 @@
 'use client';
 
-import { createWeb3Modal } from '@web3modal/wagmi';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { WagmiProvider, createConfig, http } from 'wagmi';
-import { baseSepolia, base } from 'wagmi/chains';
-import { ReactNode, useState } from 'react';
+import { ReactNode } from 'react';
+import { WagmiConfig, createConfig, configureChains } from 'wagmi';
+import { base, baseSepolia } from 'wagmi/chains';
+import { publicProvider } from 'wagmi/providers/public';
+import { MetaMaskConnector } from 'wagmi/connectors/metaMask';
+import { WalletConnectConnector } from 'wagmi/connectors/walletConnect';
+import { CoinbaseWalletConnector } from 'wagmi/connectors/coinbaseWallet';
+import { OrderProvider } from '@/context/OrderContext';
 
-// Create wagmi config
-const metadata = {
-  name: 'Crypto Limit Order DEX',
-  description: 'A decentralized exchange for limit orders on Base L2',
-  url: 'https://crypto-limit-order-dex.vercel.app',
-  icons: ['https://avatars.githubusercontent.com/u/37784886']
-};
+// Configure chains & providers
+const { chains, publicClient, webSocketPublicClient } = configureChains(
+  [base, baseSepolia],
+  [publicProvider()]
+);
 
-// Create wagmi config
+// Set up wagmi config
 const config = createConfig({
-  chains: [base, baseSepolia],
-  transports: {
-    [base.id]: http(),
-    [baseSepolia.id]: http(),
-  },
-  metadata,
-});
-
-// Create web3modal instance
-createWeb3Modal({
-  wagmiConfig: config,
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_PROJECT_ID',
-  enableAnalytics: true,
-  themeMode: 'light',
-  themeVariables: {
-    '--w3m-accent': '#3b82f6',
-  },
+  autoConnect: true,
+  connectors: [
+    new MetaMaskConnector({ chains }),
+    new CoinbaseWalletConnector({
+      chains,
+      options: {
+        appName: 'Crypto Limit Order DEX',
+      },
+    }),
+    new WalletConnectConnector({
+      chains,
+      options: {
+        projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '',
+      },
+    }),
+  ],
+  publicClient,
+  webSocketPublicClient,
 });
 
 export function Providers({ children }: { children: ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient());
-
   return (
-    <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
+    <WagmiConfig config={config}>
+      <OrderProvider>
         {children}
-      </QueryClientProvider>
-    </WagmiProvider>
+      </OrderProvider>
+    </WagmiConfig>
   );
 } 

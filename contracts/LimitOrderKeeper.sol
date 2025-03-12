@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@chainlink/contracts/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
+import "@chainlink/contracts/src/v0.8/automation/interfaces/AutomationCompatibleInterface.sol";
 import "./LimitOrderDEX.sol";
 
 /**
@@ -91,18 +91,27 @@ contract LimitOrderKeeper is AutomationCompatibleInterface {
      * @return reason Reason for failure if not executable
      */
     function canExecuteOrder(uint256 orderId) public view returns (bool isExecutable, string memory reason) {
-        LimitOrderDEX.Order memory order = dex.orders(orderId);
+        (
+            address owner,
+            address tokenIn,
+            address tokenOut,
+            uint256 amountIn,
+            uint256 amountOutMin,
+            uint256 targetPrice,
+            uint256 timestamp,
+            LimitOrderDEX.OrderStatus status
+        ) = dex.orders(orderId);
         
         // Check if order is pending
-        if (order.status != LimitOrderDEX.OrderStatus.PENDING) {
+        if (status != LimitOrderDEX.OrderStatus.PENDING) {
             return (false, "Order not pending");
         }
         
         // Check if price condition is met
         bool priceConditionMet = dex.checkPriceCondition(
-            order.tokenIn,
-            order.tokenOut,
-            order.targetPrice
+            tokenIn,
+            tokenOut,
+            targetPrice
         );
         
         if (!priceConditionMet) {
