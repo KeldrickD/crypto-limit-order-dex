@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { WagmiConfig, createConfig, configureChains } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
 import { publicProvider } from 'wagmi/providers/public';
@@ -8,6 +8,7 @@ import { MetaMaskConnector } from 'wagmi/connectors/metaMask';
 import { WalletConnectConnector } from 'wagmi/connectors/walletConnect';
 import { CoinbaseWalletConnector } from 'wagmi/connectors/coinbaseWallet';
 import { OrderProvider } from '@/context/OrderContext';
+import { initMonitoring } from '@/utils/monitoring';
 
 // Configure chains & providers
 const { chains, publicClient, webSocketPublicClient } = configureChains(
@@ -38,6 +39,11 @@ const config = createConfig({
 });
 
 export function Providers({ children }: { children: ReactNode }) {
+  // Initialize monitoring on client-side only
+  useEffect(() => {
+    initMonitoring();
+  }, []);
+
   return (
     <WagmiConfig config={config}>
       <OrderProvider>

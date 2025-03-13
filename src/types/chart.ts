@@ -21,16 +21,13 @@ export interface ChartData {
   adx?: number;
   plusDI?: number;
   minusDI?: number;
+  [key: string]: string | number | undefined | BollingerBands;
 }
 
 export interface BollingerBands {
   upper: number;
   lower: number;
   middle: number;
-}
-
-export interface ChartData extends ChartData {
-  [key: string]: string | number | undefined | BollingerBands;
 }
 
 export interface MAParams {
@@ -71,6 +68,12 @@ export interface IndicatorParams {
   ADX?: ADXParams;
 }
 
+export interface PresetConfig extends IndicatorParams {
+  name: string;
+  description: string;
+  isCustom?: boolean;
+}
+
 export interface DragState {
   isDragging: boolean;
   startX: number;
@@ -100,4 +103,6 @@ export interface IndicatorSettingsProps {
   activeIndicators: string[];
   params: IndicatorParams;
   onChange: (params: IndicatorParams) => void;
+  onApply: (params: IndicatorParams) => void;
+  onPreview?: (params: IndicatorParams) => void;
 } 

@@ -1,12 +1,23 @@
 'use client';
 
 import Link from 'next/link';
-import { useWeb3Modal } from '@web3modal/wagmi';
-import { useAccount } from 'wagmi';
+import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { MetaMaskConnector } from 'wagmi/connectors/metaMask';
 
 export default function Header() {
-  const { open } = useWeb3Modal();
   const { address, isConnected } = useAccount();
+  const { connect } = useConnect({
+    connector: new MetaMaskConnector()
+  });
+  const { disconnect } = useDisconnect();
+
+  const handleConnectClick = () => {
+    if (isConnected) {
+      disconnect();
+    } else {
+      connect();
+    }
+  };
 
   return (
     <header className="bg-white shadow-sm">
@@ -35,7 +46,7 @@ export default function Header() {
           </div>
           <div className="flex items-center">
             <button
-              onClick={() => open()}
+              onClick={handleConnectClick}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               {isConnected ? `${address?.slice(0, 6)}...${address?.slice(-4)}` : 'Connect Wallet'}

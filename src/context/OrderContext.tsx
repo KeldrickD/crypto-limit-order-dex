@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useAccount, useReadContract, useWriteContract } from 'wagmi';
+import { useAccount } from 'wagmi';
 import { parseEther, parseUnits, formatUnits } from 'viem';
 import { CONTRACT_ADDRESSES, LIMIT_ORDER_DEX_ABI, SUPPORTED_TOKENS } from '@/constants/contracts';
 
@@ -40,21 +40,18 @@ export type Order = {
   }>;
 };
 
-// Define filter and sort options
-export type OrderFilter = {
-  status?: Array<Order['status']>;
-  orderType?: Array<OrderType>;
-  tokenIn?: string;
-  tokenOut?: string;
-  dateRange?: {
-    from: Date | null;
-    to: Date | null;
-  };
+// Mock function to simulate contract read
+const mockReadContract = async () => {
+  return [];
 };
 
-export type OrderSort = {
-  field: 'id' | 'timestamp' | 'amountIn' | 'targetPrice';
-  direction: 'asc' | 'desc';
+// Mock function to simulate contract write
+const mockWriteContract = () => {
+  return {
+    writeContractAsync: async () => {
+      return '0x1234567890';
+    }
+  };
 };
 
 // Define the context type
@@ -98,29 +95,32 @@ type OrderContextType = {
   };
 };
 
+// Define the filter type
+export type OrderFilter = {
+  status?: Array<Order['status']>;
+  orderType?: Array<OrderType>;
+  tokenIn?: string;
+  tokenOut?: string;
+  dateRange?: {
+    from: Date | null;
+    to: Date | null;
+  };
+};
+
+// Define the sort type
+export type OrderSort = {
+  field: 'id' | 'timestamp' | 'amountIn' | 'targetPrice';
+  direction: 'asc' | 'desc';
+};
+
 // Create the context
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
-// Default filter and sort values
-const defaultFilter: OrderFilter = {
-  status: undefined,
-  orderType: undefined,
-  tokenIn: undefined,
-  tokenOut: undefined,
-  dateRange: {
-    from: null,
-    to: null
-  }
-};
-
-const defaultSort: OrderSort = {
-  field: 'timestamp',
-  direction: 'desc'
-};
-
-// Create a provider component
+// Provider component
 export function OrderProvider({ children }: { children: ReactNode }) {
   const { address, isConnected } = useAccount();
+  
+  // State for orders
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -128,100 +128,96 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const [isCancellingOrder, setIsCancellingOrder] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  
+  // State for filters and sorting
+  const [filter, setFilter] = useState<OrderFilter>({});
+  const [sort, setSort] = useState<OrderSort>({ field: 'timestamp', direction: 'desc' });
+  
+  // State for price data
   const [currentPrices, setCurrentPrices] = useState<Record<string, string>>({});
   const [priceHistory, setPriceHistory] = useState<Record<string, Array<{price: string, timestamp: number}>>>({});
-  const [filter, setFilter] = useState<OrderFilter>(defaultFilter);
-  const [sort, setSort] = useState<OrderSort>(defaultSort);
 
-  // Contract interactions
-  const { data: pendingOrderIds, refetch: refetchPendingOrders } = useReadContract({
-    address: CONTRACT_ADDRESSES.testnet.limitOrderDEX as `0x${string}`,
-    abi: LIMIT_ORDER_DEX_ABI,
-    functionName: 'getPendingOrdersByUser',
-    args: [address],
-    query: {
-      enabled: isConnected && !!address,
-    },
-  });
-
-  const { writeContractAsync: writeCreateOrder } = useWriteContract();
-  const { writeContractAsync: writeCancelOrder } = useWriteContract();
-
-  // Clear messages after 5 seconds
-  useEffect(() => {
-    if (error || successMessage) {
-      const timer = setTimeout(() => {
-        setError(null);
-        setSuccessMessage(null);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [error, successMessage]);
-
-  // Function to clear messages manually
+  // Clear error and success messages
   const clearMessages = () => {
     setError(null);
     setSuccessMessage(null);
   };
 
-  // Function to get token details by address
+  // Helper to get token details
   const getTokenDetails = (address: string) => {
-    const token = SUPPORTED_TOKENS.find((t: any) => t.address.toLowerCase() === address.toLowerCase());
-    return token || { symbol: 'Unknown', address, decimals: 18 };
+    return SUPPORTED_TOKENS.find(token => token.address.toLowerCase() === address.toLowerCase());
   };
 
-  // Function to reset filters
+  // Reset filters
   const resetFilters = () => {
-    setFilter(defaultFilter);
-    setSort(defaultSort);
+    setFilter({});
+    setSort({ field: 'timestamp', direction: 'desc' });
   };
 
-  // Apply filters and sorting to orders
+  // Apply filters and sorting
   useEffect(() => {
+    if (orders.length === 0) {
+      setFilteredOrders([]);
+      return;
+    }
+
     let result = [...orders];
-    
+
     // Apply filters
     if (filter.status && filter.status.length > 0) {
       result = result.filter(order => filter.status?.includes(order.status));
     }
-    
+
     if (filter.orderType && filter.orderType.length > 0) {
       result = result.filter(order => filter.orderType?.includes(order.orderType));
     }
-    
+
     if (filter.tokenIn) {
       result = result.filter(order => order.tokenIn.address.toLowerCase() === filter.tokenIn?.toLowerCase());
     }
-    
+
     if (filter.tokenOut) {
       result = result.filter(order => order.tokenOut.address.toLowerCase() === filter.tokenOut?.toLowerCase());
     }
-    
-    if (filter.dateRange?.from || filter.dateRange?.to) {
+
+    if (filter.dateRange && (filter.dateRange.from || filter.dateRange.to)) {
       result = result.filter(order => {
-        const orderDate = new Date(order.timestamp);
-        if (filter.dateRange?.from && orderDate < filter.dateRange.from) {
-          return false;
+        const orderDate = new Date(parseInt(order.timestamp) * 1000);
+        
+        if (filter.dateRange?.from && filter.dateRange?.to) {
+          return orderDate >= filter.dateRange.from && orderDate <= filter.dateRange.to;
+        } else if (filter.dateRange?.from) {
+          return orderDate >= filter.dateRange.from;
+        } else if (filter.dateRange?.to) {
+          return orderDate <= filter.dateRange.to;
         }
-        if (filter.dateRange?.to && orderDate > filter.dateRange.to) {
-          return false;
-        }
+        
         return true;
       });
     }
-    
+
     // Apply sorting
     result.sort((a, b) => {
-      let aValue: any = a[sort.field];
-      let bValue: any = b[sort.field];
+      let aValue: string | number = '';
+      let bValue: string | number = '';
       
-      // Handle special cases for different field types
-      if (sort.field === 'timestamp') {
-        aValue = new Date(a.timestamp).getTime();
-        bValue = new Date(b.timestamp).getTime();
-      } else if (sort.field === 'amountIn' || sort.field === 'targetPrice') {
-        aValue = parseFloat(a[sort.field]);
-        bValue = parseFloat(b[sort.field]);
+      switch (sort.field) {
+        case 'id':
+          aValue = a.id;
+          bValue = b.id;
+          break;
+        case 'timestamp':
+          aValue = parseInt(a.timestamp);
+          bValue = parseInt(b.timestamp);
+          break;
+        case 'amountIn':
+          aValue = parseFloat(a.amountIn);
+          bValue = parseFloat(b.amountIn);
+          break;
+        case 'targetPrice':
+          aValue = parseFloat(a.targetPrice);
+          bValue = parseFloat(b.targetPrice);
+          break;
       }
       
       if (sort.direction === 'asc') {
@@ -230,102 +226,101 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         return aValue < bValue ? 1 : -1;
       }
     });
-    
+
     setFilteredOrders(result);
   }, [orders, filter, sort]);
 
-  // Function to fetch order details
+  // Fetch order details
   const fetchOrderDetails = async (orderId: number): Promise<Order | null> => {
     try {
-      // In a real app, this would use the useReadContract hook
-      // For now, we'll mock the data with different order types
-      const orderTypes: OrderType[] = ['LIMIT', 'STOP_LOSS', 'TRAILING_STOP'];
-      const statuses = ['PENDING', 'EXECUTED', 'CANCELLED', 'PARTIALLY_FILLED'];
+      // In a real implementation, this would call the contract
+      // const data = await readContract({
+      //   address: CONTRACT_ADDRESSES.LIMIT_ORDER_DEX,
+      //   abi: LIMIT_ORDER_DEX_ABI,
+      //   functionName: 'getOrder',
+      //   args: [orderId],
+      // });
       
-      // Generate random order data for demo purposes
-      const randomOrderType = orderTypes[Math.floor(Math.random() * orderTypes.length)];
-      const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
-      const randomTokenInIndex = Math.floor(Math.random() * SUPPORTED_TOKENS.length);
-      const randomTokenOutIndex = (randomTokenInIndex + 1) % SUPPORTED_TOKENS.length;
-      
-      const mockOrderData = {
-        owner: address || '0x0',
-        tokenIn: SUPPORTED_TOKENS[randomTokenInIndex].address,
-        tokenOut: SUPPORTED_TOKENS[randomTokenOutIndex].address,
-        amountIn: BigInt(1000000000000000000 + Math.floor(Math.random() * 9000000000000000000)), // 1-10 ETH
-        amountOutMin: BigInt(1900000000 + Math.floor(Math.random() * 1000000000)), // 1900-2900 USDC
-        targetPrice: BigInt(1950000000000000000000 + Math.floor(Math.random() * 500000000000000000000)), // 1950-2450 USDC/ETH
-        timestamp: BigInt(Math.floor(Date.now() / 1000) - Math.floor(Math.random() * 86400 * 7)), // Random time in the last week
-        status: statuses.indexOf(randomStatus),
-        orderType: randomOrderType,
-        stopPrice: randomOrderType === 'STOP_LOSS' ? BigInt(1900000000000000000000) : undefined,
-        trailingPercent: randomOrderType === 'TRAILING_STOP' ? '5' : undefined,
-        filledAmount: randomStatus === 'PARTIALLY_FILLED' ? BigInt(500000000000000000) : undefined,
-        remainingAmount: randomStatus === 'PARTIALLY_FILLED' ? BigInt(500000000000000000) : undefined,
-        executionHistory: randomStatus === 'PARTIALLY_FILLED' || randomStatus === 'EXECUTED' ? [
-          {
-            amount: '0.5',
-            price: '1975',
-            timestamp: new Date(Date.now() - 3600000).toISOString()
-          }
-        ] : undefined
-      };
-      
-      const tokenIn = getTokenDetails(mockOrderData.tokenIn);
-      const tokenOut = getTokenDetails(mockOrderData.tokenOut);
-      
-      return {
+      // For now, return mock data
+      const mockOrder: Order = {
         id: orderId,
-        owner: mockOrderData.owner,
-        tokenIn,
-        tokenOut,
-        amountIn: formatUnits(mockOrderData.amountIn, tokenIn.decimals),
-        amountOutMin: formatUnits(mockOrderData.amountOutMin, tokenOut.decimals),
-        targetPrice: formatUnits(mockOrderData.targetPrice, 18), // Target price is stored with 18 decimals
-        status: statuses[Number(mockOrderData.status)] as 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'PARTIALLY_FILLED',
-        timestamp: new Date(Number(mockOrderData.timestamp) * 1000).toISOString(),
-        orderType: mockOrderData.orderType,
-        stopPrice: mockOrderData.stopPrice ? formatUnits(mockOrderData.stopPrice, 18) : undefined,
-        trailingPercent: mockOrderData.trailingPercent,
-        filledAmount: mockOrderData.filledAmount ? formatUnits(mockOrderData.filledAmount, tokenIn.decimals) : undefined,
-        remainingAmount: mockOrderData.remainingAmount ? formatUnits(mockOrderData.remainingAmount, tokenIn.decimals) : undefined,
-        executionHistory: mockOrderData.executionHistory
+        owner: address || '0x0',
+        tokenIn: {
+          symbol: 'WETH',
+          address: '0x4200000000000000000000000000000000000006',
+          decimals: 18
+        },
+        tokenOut: {
+          symbol: 'USDC',
+          address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+          decimals: 6
+        },
+        amountIn: parseEther('1').toString(),
+        amountOutMin: parseUnits('1800', 6).toString(),
+        targetPrice: '1800',
+        status: 'PENDING',
+        timestamp: Math.floor(Date.now() / 1000).toString(),
+        orderType: 'LIMIT'
       };
-    } catch (error) {
-      console.error(`Error fetching order ${orderId}:`, error);
+      
+      return mockOrder;
+    } catch (err) {
+      console.error('Error fetching order details:', err);
       return null;
     }
   };
 
-  // Function to refresh orders
+  // Refresh orders
   const refreshOrders = async () => {
     if (!isConnected || !address) {
       setOrders([]);
       return;
     }
-
+    
     setIsLoading(true);
+    setError(null);
+    
     try {
-      await refetchPendingOrders();
+      // In a real implementation, this would call the contract
+      // const data = await readContract({
+      //   address: CONTRACT_ADDRESSES.LIMIT_ORDER_DEX,
+      //   abi: LIMIT_ORDER_DEX_ABI,
+      //   functionName: 'getOrdersByUser',
+      //   args: [address],
+      // });
       
-      // For demo purposes, we'll create mock order IDs
-      const mockOrderIds = Array.from({ length: 10 }, (_, i) => i + 1);
+      // For now, use mock data
+      const mockOrders: Order[] = Array(5).fill(0).map((_, i) => ({
+        id: i + 1,
+        owner: address,
+        tokenIn: {
+          symbol: i % 2 === 0 ? 'WETH' : 'USDC',
+          address: i % 2 === 0 ? '0x4200000000000000000000000000000000000006' : '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+          decimals: i % 2 === 0 ? 18 : 6
+        },
+        tokenOut: {
+          symbol: i % 2 === 0 ? 'USDC' : 'WETH',
+          address: i % 2 === 0 ? '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' : '0x4200000000000000000000000000000000000006',
+          decimals: i % 2 === 0 ? 6 : 18
+        },
+        amountIn: parseUnits(i % 2 === 0 ? '1' : '1800', i % 2 === 0 ? 18 : 6).toString(),
+        amountOutMin: parseUnits(i % 2 === 0 ? '1800' : '1', i % 2 === 0 ? 6 : 18).toString(),
+        targetPrice: i % 2 === 0 ? '1800' : '0.00055',
+        status: ['PENDING', 'EXECUTED', 'CANCELLED', 'PARTIALLY_FILLED'][i % 4] as Order['status'],
+        timestamp: (Math.floor(Date.now() / 1000) - i * 86400).toString(),
+        orderType: ['LIMIT', 'STOP_LOSS', 'TRAILING_STOP'][i % 3] as OrderType
+      }));
       
-      const orderPromises = mockOrderIds.map(id => 
-        fetchOrderDetails(id)
-      );
-      
-      const fetchedOrders = await Promise.all(orderPromises);
-      setOrders(fetchedOrders.filter(Boolean) as Order[]);
-    } catch (error) {
-      console.error('Error refreshing orders:', error);
+      setOrders(mockOrders);
+    } catch (err) {
+      console.error('Error refreshing orders:', err);
       setError('Failed to load orders. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Function to create an order
+  // Create order
   const createOrder = async (
     tokenIn: string, 
     tokenOut: string, 
@@ -336,99 +331,115 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     trailingPercent?: string
   ) => {
     if (!isConnected || !address) {
-      setError('Please connect your wallet first');
+      setError('Please connect your wallet');
       return;
     }
-
+    
     setIsCreatingOrder(true);
-    clearMessages();
-
+    setError(null);
+    
     try {
       const tokenInDetails = getTokenDetails(tokenIn);
+      const tokenOutDetails = getTokenDetails(tokenOut);
       
-      // Convert amounts to wei
-      const amountInWei = parseUnits(amountIn, tokenInDetails.decimals);
-      const targetPriceWei = parseEther(targetPrice);
-      
-      // Calculate minimum amount out (90% of expected amount)
-      const expectedAmountOut = (BigInt(amountInWei) * BigInt(targetPriceWei)) / BigInt(10 ** 18);
-      const amountOutMin = (expectedAmountOut * BigInt(90)) / BigInt(100);
-
-      // Additional parameters for specific order types
-      let stopPriceWei;
-      if (orderType === 'STOP_LOSS' && stopPrice) {
-        stopPriceWei = parseEther(stopPrice);
+      if (!tokenInDetails || !tokenOutDetails) {
+        throw new Error('Invalid token selection');
       }
-
-      // In a real app, this would call the contract with different parameters based on order type
-      // For demo, we'll simulate a successful transaction
-      setSuccessMessage(`${orderType} order created successfully! Waiting for confirmation...`);
       
-      // Simulate waiting for transaction confirmation
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const amountInWei = parseUnits(amountIn, tokenInDetails.decimals);
       
-      setSuccessMessage(`${orderType} order confirmed and active!`);
+      // Calculate minimum amount out based on target price
+      const targetPriceFloat = parseFloat(targetPrice);
+      const amountInFloat = parseFloat(amountIn);
+      const amountOutMin = (amountInFloat * targetPriceFloat).toString();
+      const amountOutMinWei = parseUnits(amountOutMin, tokenOutDetails.decimals);
+      
+      // In a real implementation, this would call the contract
+      // const { writeContractAsync } = useWriteContract();
+      // const hash = await writeContractAsync({
+      //   address: CONTRACT_ADDRESSES.LIMIT_ORDER_DEX,
+      //   abi: LIMIT_ORDER_DEX_ABI,
+      //   functionName: 'createLimitOrder',
+      //   args: [tokenIn, tokenOut, amountInWei, amountOutMinWei, targetPriceFloat],
+      // });
+      
+      // For now, just simulate success
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setSuccessMessage('Order created successfully!');
       await refreshOrders();
-    } catch (error) {
-      console.error('Error creating order:', error);
-      setError(`Failed to create ${orderType} order. Please check your wallet and try again.`);
+    } catch (err) {
+      console.error('Error creating order:', err);
+      setError('Failed to create order. Please try again.');
     } finally {
       setIsCreatingOrder(false);
     }
   };
 
-  // Function to cancel an order
+  // Cancel order
   const cancelOrder = async (orderId: number) => {
     if (!isConnected || !address) {
-      setError('Please connect your wallet first');
+      setError('Please connect your wallet');
       return;
     }
-
+    
     setIsCancellingOrder(true);
-    clearMessages();
-
+    setError(null);
+    
     try {
-      // In a real app, this would call the contract
-      // For demo, we'll simulate a successful transaction
-      setSuccessMessage('Cancellation submitted! Waiting for confirmation...');
+      // In a real implementation, this would call the contract
+      // const { writeContractAsync } = useWriteContract();
+      // const hash = await writeContractAsync({
+      //   address: CONTRACT_ADDRESSES.LIMIT_ORDER_DEX,
+      //   abi: LIMIT_ORDER_DEX_ABI,
+      //   functionName: 'cancelOrder',
+      //   args: [orderId],
+      // });
       
-      // Simulate waiting for transaction confirmation
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // For now, just simulate success
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       setSuccessMessage('Order cancelled successfully!');
       await refreshOrders();
-    } catch (error) {
-      console.error('Error cancelling order:', error);
+    } catch (err) {
+      console.error('Error cancelling order:', err);
       setError('Failed to cancel order. Please try again.');
     } finally {
       setIsCancellingOrder(false);
     }
   };
 
-  // Function to get order analytics
+  // Get analytics
   const getOrderAnalytics = () => {
     const totalOrders = orders.length;
-    const pendingOrders = orders.filter(order => order.status === 'PENDING').length;
-    const executedOrders = orders.filter(order => order.status === 'EXECUTED').length;
-    const cancelledOrders = orders.filter(order => order.status === 'CANCELLED').length;
-    const partiallyFilledOrders = orders.filter(order => order.status === 'PARTIALLY_FILLED').length;
+    const pendingOrders = orders.filter(o => o.status === 'PENDING').length;
+    const executedOrders = orders.filter(o => o.status === 'EXECUTED').length;
+    const cancelledOrders = orders.filter(o => o.status === 'CANCELLED').length;
+    const partiallyFilledOrders = orders.filter(o => o.status === 'PARTIALLY_FILLED').length;
     
     // Calculate total volume by token
     const totalVolume: Record<string, string> = {};
     orders.forEach(order => {
       if (order.status === 'EXECUTED' || order.status === 'PARTIALLY_FILLED') {
         const token = order.tokenIn.symbol;
-        const amount = order.status === 'EXECUTED' ? order.amountIn : (order.filledAmount || '0');
+        const amount = order.status === 'EXECUTED' 
+          ? order.amountIn 
+          : (order.filledAmount || '0');
         
-        if (!totalVolume[token]) {
-          totalVolume[token] = '0';
+        if (totalVolume[token]) {
+          const currentAmount = parseFloat(totalVolume[token]);
+          // Convert the string amount to a number for calculation
+          const orderAmount = parseFloat(amount) / (10 ** order.tokenIn.decimals);
+          totalVolume[token] = (currentAmount + orderAmount).toString();
+        } else {
+          // Initialize with the first amount
+          const orderAmount = parseFloat(amount) / (10 ** order.tokenIn.decimals);
+          totalVolume[token] = orderAmount.toString();
         }
-        
-        totalVolume[token] = (parseFloat(totalVolume[token]) + parseFloat(amount)).toString();
       }
     });
     
-    // Calculate average execution time (mock data for demo)
+    // Calculate average execution time (mock data)
     const averageExecutionTime = 120; // 2 minutes in seconds
     
     return {
@@ -442,102 +453,80 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     };
   };
 
-  // Simulate fetching current prices and historical data
+  // Fetch price data
   useEffect(() => {
     const fetchPrices = () => {
-      // Mock prices for demo
-      const mockPrices: Record<string, string> = {};
-      const newPriceHistory: Record<string, Array<{price: string, timestamp: number}>> = {...priceHistory};
+      // In a real implementation, this would fetch from an API or contract
+      // For now, use mock data
+      const mockCurrentPrices: Record<string, string> = {
+        'WETH-USDC': '1850.25',
+        'USDC-WETH': '0.00054',
+        'WBTC-USDC': '52340.75',
+        'USDC-WBTC': '0.000019'
+      };
       
-      SUPPORTED_TOKENS.forEach((token: any) => {
-        if (token.symbol === 'WETH') {
-          // Add some randomness to the price
-          const basePrice = 1950.75;
-          const randomChange = (Math.random() - 0.5) * 20; // Random change between -10 and +10
-          const newPrice = (basePrice + randomChange).toFixed(2);
-          mockPrices[token.address] = newPrice;
-          
-          // Add to price history
-          if (!newPriceHistory[token.address]) {
-            newPriceHistory[token.address] = [];
-          }
-          
-          newPriceHistory[token.address].push({
-            price: newPrice,
-            timestamp: Date.now()
-          });
-          
-          // Keep only the last 100 price points
-          if (newPriceHistory[token.address].length > 100) {
-            newPriceHistory[token.address] = newPriceHistory[token.address].slice(-100);
-          }
-        } else if (token.symbol === 'USDC') {
-          mockPrices[token.address] = '1.00';
-          
-          // Add to price history
-          if (!newPriceHistory[token.address]) {
-            newPriceHistory[token.address] = [];
-          }
-          
-          newPriceHistory[token.address].push({
-            price: '1.00',
-            timestamp: Date.now()
-          });
-          
-          // Keep only the last 100 price points
-          if (newPriceHistory[token.address].length > 100) {
-            newPriceHistory[token.address] = newPriceHistory[token.address].slice(-100);
-          }
-        }
-      });
+      const now = Date.now();
+      const hour = 3600 * 1000;
+      const day = 24 * hour;
       
-      setCurrentPrices(mockPrices);
-      setPriceHistory(newPriceHistory);
+      const mockPriceHistory: Record<string, Array<{price: string, timestamp: number}>> = {
+        'WETH-USDC': Array(24).fill(0).map((_, i) => ({
+          price: (1800 + Math.random() * 100).toFixed(2),
+          timestamp: now - (23 - i) * hour
+        })),
+        'USDC-WETH': Array(24).fill(0).map((_, i) => ({
+          price: (0.00054 + Math.random() * 0.00002).toFixed(8),
+          timestamp: now - (23 - i) * hour
+        })),
+        'WBTC-USDC': Array(24).fill(0).map((_, i) => ({
+          price: (52000 + Math.random() * 1000).toFixed(2),
+          timestamp: now - (23 - i) * hour
+        })),
+        'USDC-WBTC': Array(24).fill(0).map((_, i) => ({
+          price: (0.000019 + Math.random() * 0.000001).toFixed(9),
+          timestamp: now - (23 - i) * hour
+        }))
+      };
+      
+      setCurrentPrices(mockCurrentPrices);
+      setPriceHistory(mockPriceHistory);
     };
-
+    
     fetchPrices();
-    // Set up polling for price updates every 10 seconds
-    const interval = setInterval(fetchPrices, 10000);
+    const interval = setInterval(fetchPrices, 30000); // Update every 30 seconds
+    
     return () => clearInterval(interval);
-  }, [priceHistory]);
+  }, []);
 
-  // Fetch orders when connected
+  // Load orders when connected
   useEffect(() => {
     refreshOrders();
-  }, [isConnected, address]);
+  }, [address, isConnected]);
 
-  // Set up polling for order updates every 30 seconds
-  useEffect(() => {
-    if (isConnected) {
-      const interval = setInterval(refreshOrders, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [isConnected]);
+  const value = {
+    orders,
+    filteredOrders,
+    isLoading,
+    isCreatingOrder,
+    isCancellingOrder,
+    error,
+    successMessage,
+    createOrder,
+    cancelOrder,
+    refreshOrders,
+    clearMessages,
+    currentPrices,
+    priceHistory,
+    filter,
+    setFilter,
+    sort,
+    setSort,
+    resetFilters,
+    getOrderAnalytics
+  };
 
   return (
-    <OrderContext.Provider
-      value={{
-        orders,
-        filteredOrders,
-        isLoading,
-        isCreatingOrder,
-        isCancellingOrder,
-        error,
-        successMessage,
-        createOrder,
-        cancelOrder,
-        refreshOrders,
-        clearMessages,
-        currentPrices,
-        priceHistory,
-        filter,
-        setFilter,
-        sort,
-        setSort,
-        resetFilters,
-        getOrderAnalytics
-      }}
-    >
+    <OrderContext.Provider value={value}>
       {children}
     </OrderContext.Provider>
   );

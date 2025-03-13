@@ -1,120 +1,128 @@
 # Crypto Limit Order DEX
 
-A decentralized exchange that lets users place limit orders (buy/sell orders that execute automatically when price conditions are met) on Base L2. The DEX leverages smart contracts for order management, Chainlink for price feeds and automation, and Uniswap V3 for liquidity.
+A decentralized exchange (DEX) with limit order functionality built on Base blockchain.
 
 ## Features
 
-- **Smart Contract Order Book**: Create, cancel, and execute limit orders
-- **Price Feeds Integration**: Uses Chainlink to fetch real-time price data
-- **Liquidity Sourcing**: Integrates with Uniswap V3 on Base for trade execution
-- **Wallet Integration**: Support for popular wallets via Web3 connectors
-- **Order Automation**: Utilizes Chainlink Automation to trigger order execution
+- **Limit Orders**: Place buy and sell orders at specific price points
+- **Advanced Charting**: Technical analysis with customizable indicators
+- **Order Management**: Track and manage your active and historical orders
+- **Portfolio Overview**: View your token holdings and performance
+- **Customizable Dashboard**: Arrange widgets to suit your trading style
+- **Dark/Light Mode**: Choose your preferred theme
 
-## Project Structure
+## Tech Stack
 
-```
-crypto-limit-order-dex/
-├── contracts/                # Smart contracts
-│   ├── LimitOrderDEX.sol     # Main DEX contract
-│   ├── LimitOrderKeeper.sol  # Chainlink Keeper contract
-│   └── mocks/                # Mock contracts for testing
-├── scripts/                  # Deployment scripts
-├── test/                     # Test files
-└── src/                      # Frontend (Next.js)
-```
+- **Frontend**: Next.js, React, TypeScript, TailwindCSS
+- **Blockchain**: Solidity, Hardhat, Ethers.js
+- **Testing**: Jest, React Testing Library, Playwright
+- **State Management**: React Context API
+- **Styling**: TailwindCSS, HeadlessUI
 
-## Prerequisites
+## Getting Started
 
-- Node.js (v16+)
-- npm or yarn
+### Prerequisites
+
+- Node.js 18+
+- npm 9+
 - MetaMask or other Web3 wallet
 
-## Installation
+### Installation
 
 1. Clone the repository:
-   ```
+   ```bash
    git clone https://github.com/yourusername/crypto-limit-order-dex.git
    cd crypto-limit-order-dex
    ```
 
 2. Install dependencies:
-   ```
+   ```bash
    npm install
    ```
 
-3. Create a `.env` file based on `.env.example`:
+3. Set up environment variables:
+   ```bash
+   cp .env.example .env.local
    ```
-   cp .env.example .env
+   Edit `.env.local` with your configuration.
+
+4. Start the development server:
+   ```bash
+   npm run dev
    ```
-   Fill in your private key and other required variables.
 
-## Smart Contract Development
+5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### Compile Contracts
+## Testing
 
-```
-npx hardhat compile
-```
+### Unit Tests
 
-### Run Tests
-
-```
-npx hardhat test
+Run unit tests with Jest:
+```bash
+npm test
 ```
 
-### Deploy Contracts
-
-To deploy to Base Sepolia testnet:
-
-```
-npx hardhat run scripts/deploy.ts --network baseSepolia
+Run tests with coverage report:
+```bash
+npm run test:coverage
 ```
 
-To deploy to Base mainnet:
+### Integration Tests
 
+Run integration tests with Playwright:
+```bash
+npm run test:integration
 ```
+
+Run integration tests with UI:
+```bash
+npm run test:integration:ui
+```
+
+## Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
+
+### Quick Deployment
+
+Deploy to staging:
+```bash
+bash scripts/deploy-frontend.sh staging
+```
+
+Deploy to production:
+```bash
+bash scripts/deploy-frontend.sh production
+```
+
+## Smart Contracts
+
+The DEX uses the following smart contracts:
+
+- **LimitOrderDEX**: Main contract for placing and executing limit orders
+- **LimitOrderKeeper**: Chainlink Keeper compatible contract for automated order execution
+
+### Contract Deployment
+
+Deploy contracts to Base network:
+```bash
 npx hardhat run scripts/deploy.ts --network base
 ```
 
-## Frontend Development
+## Contributing
 
-### Run Development Server
-
-```
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Build for Production
-
-```
-npm run build
-```
-
-## Usage
-
-1. Connect your wallet to the DEX
-2. Select tokens for your limit order
-3. Set the amount and target price
-4. Submit the order
-5. Orders will execute automatically when price conditions are met
-
-## Architecture
-
-### Smart Contracts
-
-- **LimitOrderDEX**: Manages the order book, handles order creation, cancellation, and execution
-- **LimitOrderKeeper**: Chainlink Keeper contract that automatically checks and executes orders when conditions are met
-
-### Price Feeds
-
-The DEX uses Chainlink price feeds to get real-time price data for tokens. This ensures that orders are executed at fair market prices.
-
-### Order Execution
-
-When a user creates a limit order, the tokens are locked in the contract. The Chainlink Keeper regularly checks if any orders can be executed based on current market prices. When the price condition is met, the order is executed using Uniswap V3 for the actual swap.
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Base blockchain for providing the infrastructure
+- Uniswap for DEX inspiration
+- TradingView for charting inspiration

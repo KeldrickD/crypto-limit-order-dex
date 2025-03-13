@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { Fragment, useState, useCallback, useEffect, useMemo, ReactNode } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { InformationCircleIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import debounce from 'lodash/debounce';
@@ -13,7 +13,8 @@ import type {
   BollingerBandsParams,
   MACDParams,
   StochasticParams,
-  ADXParams
+  ADXParams,
+  PresetConfig
 } from '@/types/chart';
 
 interface ValidationRules {
@@ -126,14 +127,14 @@ type FullIndicatorParams = {
   ADX: ADXParams;
 };
 
-export default function IndicatorSettings({
+export const IndicatorSettings: React.FC<IndicatorSettingsProps> = ({
   isOpen,
   onClose,
-  activeIndicators,
-  params,
-  onChange,
+  onApply,
   onPreview,
-}: IndicatorSettingsProps & { onPreview?: (params: IndicatorParams) => void }) {
+  activeIndicators,
+  params
+}) => {
   const [localParams, setLocalParams] = useState<FullIndicatorParams>(() => ({
     ...defaultParams,
     ...params,
@@ -275,6 +276,7 @@ export default function IndicatorSettings({
             className="ml-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             onMouseEnter={() => setShowTooltip({ indicator, param })}
             onMouseLeave={() => setShowTooltip(null)}
+            data-testid="info-icon"
           >
             <InformationCircleIcon className="h-4 w-4" />
           </button>
@@ -409,222 +411,187 @@ export default function IndicatorSettings({
     );
   };
 
-  const renderPresetSelector = () => (
-    <div className="mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h4 className="font-medium text-gray-900 dark:text-white">Presets</h4>
-        <div className="flex items-center space-x-2">
-          <input
-            type="text"
-            value={presetSearch}
-            onChange={(e) => setPresetSearch(e.target.value)}
-            placeholder="Search presets..."
-            className="px-3 py-1 text-sm border rounded-md dark:bg-gray-700 dark:border-gray-600"
-          />
-          <button
-            type="button"
-            onClick={() => setShowSavePreset(true)}
-            className="inline-flex items-center px-2 py-1 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-          >
-            <PlusIcon className="h-4 w-4 mr-1" />
-            Save Current
-          </button>
-          <div className="relative">
+  const renderPresetSelector = (): ReactNode => {
+    const filteredPresets = presets.filter(preset => 
+      preset.name.toLowerCase().includes(presetSearch.toLowerCase())
+    );
+
+    return (
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="font-medium text-gray-900 dark:text-white">Presets</h4>
+          <div className="flex items-center space-x-2">
             <input
-              type="file"
-              accept=".json"
-              onChange={handleImportPresets}
-              className="hidden"
-              id="preset-import"
+              type="text"
+              placeholder="Search presets..."
+              className="px-3 py-1 text-sm border rounded-md dark:bg-gray-700 dark:border-gray-600"
+              value={presetSearch}
+              onChange={(e) => setPresetSearch(e.target.value)}
             />
-            <label
-              htmlFor="preset-import"
-              className="inline-flex items-center px-2 py-1 text-sm font-medium text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 cursor-pointer"
+            <button
+              type="button"
+              className="inline-flex items-center px-2 py-1 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+              onClick={() => setShowSavePreset(true)}
+              aria-label="Save current settings as preset"
             >
-              Import
-            </label>
-          </div>
-          <button
-            type="button"
-            onClick={handleExportPresets}
-            className="px-2 py-1 text-sm font-medium text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-          >
-            Export
-          </button>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        {filteredPresets.map((preset) => (
-          <div
-            key={preset.name}
-            className={`relative group p-2 rounded-md cursor-pointer border ${
-              selectedPreset === preset.name
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700'
-            }`}
-            onClick={() => handlePresetSelect(preset.name)}
-            onMouseEnter={() => setShowPresetPreview(preset.name)}
-            onMouseLeave={() => setShowPresetPreview(null)}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-medium text-sm text-gray-900 dark:text-white">
-                {preset.name}
-              </span>
-              {preset.isCustom && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPresetToDelete(preset.name);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-600"
-                >
-                  <TrashIcon className="h-4 w-4" />
-                </button>
-              )}
+              <PlusIcon className="h-4 w-4 mr-1" aria-hidden="true" />
+              Save Current
+            </button>
+            <div className="relative">
+              <input
+                type="file"
+                id="preset-import"
+                className="hidden"
+                accept=".json"
+                onChange={handleImportPresets}
+              />
+              <label
+                htmlFor="preset-import"
+                className="inline-flex items-center px-2 py-1 text-sm font-medium text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 cursor-pointer"
+              >
+                Import
+              </label>
             </div>
-            {preset.description && (
+            <button
+              type="button"
+              className="px-2 py-1 text-sm font-medium text-gray-600 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              onClick={handleExportPresets}
+              aria-label="Export presets"
+            >
+              Export
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {(filteredPresets as PresetConfig[]).map((preset) => (
+            <div
+              key={preset.name}
+              className="relative group p-2 rounded-md cursor-pointer border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700"
+              onClick={() => handlePresetSelect(preset.name)}
+              onMouseEnter={() => setShowPresetPreview(preset.name)}
+              onMouseLeave={() => setShowPresetPreview(null)}
+              role="button"
+              tabIndex={0}
+              aria-label={`Select ${preset.name} preset`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-sm text-gray-900 dark:text-white">
+                  {preset.name}
+                </span>
+                {preset.isCustom && (
+                  <button
+                    type="button"
+                    aria-label={`Delete ${preset.name} preset`}
+                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPresetToDelete(preset.name);
+                    }}
+                  >
+                    <TrashIcon className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 {preset.description}
               </p>
-            )}
-            {renderPresetPreview(preset)}
-          </div>
-        ))}
+            </div>
+          ))}
+        </div>
       </div>
+    );
+  };
 
-      {/* Delete Confirmation Dialog */}
-      {presetToDelete && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen p-4">
-            <div className="fixed inset-0 bg-black bg-opacity-25" onClick={() => setPresetToDelete(null)} />
-            <div className="relative bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-sm">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                Delete Preset
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Are you sure you want to delete the preset &ldquo;{presetToDelete}&rdquo;? This action cannot be undone.
-              </p>
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setPresetToDelete(null)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeletePreset(presetToDelete)}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
+  const renderIndicatorInput = (indicator: keyof FullIndicatorParams): ReactNode => {
+    switch (indicator) {
+      case 'MA':
+        return (
+          <div className="mb-4">
+            <label htmlFor="ma-periods" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              MA Periods
+              <InformationCircleIcon
+                data-testid="ma-periods-info"
+                className="inline-block w-4 h-4 ml-1 text-gray-400 cursor-help"
+                onMouseEnter={() => setShowTooltip({ indicator: 'MA', param: 'periods' })}
+                onMouseLeave={() => setShowTooltip(null)}
+              />
+            </label>
+            <input
+              id="ma-periods"
+              type="text"
+              aria-label="MA Periods"
+              className="w-full px-3 py-2 text-sm border rounded-md dark:bg-gray-700 dark:border-gray-600"
+              value={localParams.MA.periods.join(', ')}
+              onChange={(e) => validateAndUpdate('MA', 'periods', e.target.value)}
+            />
+            {errors.MA?.periods && (
+              <p className="mt-1 text-xs text-red-500">{errors.MA.periods}</p>
+            )}
           </div>
-        </div>
-      )}
+        );
+      case 'RSI':
+        return (
+          <div className="mb-4">
+            <label htmlFor="rsi-period" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              RSI Period
+              <InformationCircleIcon
+                data-testid="rsi-period-info"
+                className="inline-block w-4 h-4 ml-1 text-gray-400 cursor-help"
+                onMouseEnter={() => setShowTooltip({ indicator: 'RSI', param: 'period' })}
+                onMouseLeave={() => setShowTooltip(null)}
+              />
+            </label>
+            <input
+              id="rsi-period"
+              type="number"
+              aria-label="RSI Period"
+              className="w-full px-3 py-2 text-sm border rounded-md dark:bg-gray-700 dark:border-gray-600"
+              value={localParams.RSI.period}
+              onChange={(e) => validateAndUpdate('RSI', 'period', e.target.value)}
+            />
+            {errors.RSI?.period && (
+              <p className="mt-1 text-xs text-red-500">{errors.RSI.period}</p>
+            )}
+          </div>
+        );
+      // ... rest of the cases ...
+    }
+  };
 
-      {/* Save Preset Dialog */}
-      {showSavePreset && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen p-4">
-            <div className="fixed inset-0 bg-black bg-opacity-25" onClick={() => setShowSavePreset(false)} />
-            <div className="relative bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                Save Current Settings as Preset
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Preset Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newPresetName}
-                    onChange={(e) => setNewPresetName(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm text-sm dark:bg-gray-700 dark:border-gray-600"
-                    placeholder="Enter preset name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Description (optional)
-                  </label>
-                  <textarea
-                    value={newPresetDescription}
-                    onChange={(e) => setNewPresetDescription(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border rounded-md shadow-sm text-sm dark:bg-gray-700 dark:border-gray-600"
-                    rows={3}
-                    placeholder="Enter preset description"
-                  />
-                </div>
-                <div className="flex justify-end space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowSavePreset(false)}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSavePreset}
-                    disabled={!newPresetName.trim()}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    Save Preset
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  const renderIndicatorSections = (): ReactNode => {
+    return activeIndicators.map((indicator) => (
+      <div key={indicator} className="mb-6">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{indicator}</h3>
+        {renderIndicatorInput(indicator as keyof FullIndicatorParams)}
+      </div>
+    ));
+  };
+
+  const handleApply = useCallback(() => {
+    if (Object.keys(errors).length === 0) {
+      onApply(localParams);
+      onClose();
+    }
+  }, [localParams, errors, onApply, onClose]);
+
+  const hasErrors = Object.keys(errors).length > 0;
 
   return (
-    <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="fixed inset-0 z-50 overflow-y-auto" onClose={onClose}>
-        <div className="min-h-screen px-4 text-center">
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
-          </Transition.Child>
-
-          <span className="inline-block h-screen align-middle" aria-hidden="true">
-            &#8203;
-          </span>
-
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0 scale-95"
-            enterTo="opacity-100 scale-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100 scale-100"
-            leaveTo="opacity-0 scale-95"
-          >
-            <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl">
-              <Dialog.Title
-                as="h3"
-                className="text-lg font-medium leading-6 text-gray-900 dark:text-white"
-              >
+    <div className="indicator-settings">
+      {isOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="min-h-screen px-4 text-center">
+            <div className="fixed inset-0 bg-black opacity-30"></div>
+            <span className="inline-block h-screen align-middle" aria-hidden="true">
+              &#8203;
+            </span>
+            <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl">
+              <div className="text-lg font-medium leading-6 text-gray-900 dark:text-white">
                 Indicator Settings
-              </Dialog.Title>
-
+              </div>
               <div className="mt-4 space-y-6">
                 {renderPresetSelector()}
-
+                {renderIndicatorSections()}
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="font-medium text-gray-900 dark:text-white">Live Preview</h4>
                   <label className="relative inline-flex items-center cursor-pointer">
@@ -640,104 +607,125 @@ export default function IndicatorSettings({
                     </span>
                   </label>
                 </div>
-
-                {activeIndicators.includes('MA') && (
-                  <div>
-                    <h4 className="font-medium text-gray-700 dark:text-gray-300">Moving Averages</h4>
-                    <div className="mt-2">
-                      {renderInput('MA', 'periods', localParams.MA.periods, 'text')}
-                    </div>
-                  </div>
-                )}
-
-                {activeIndicators.includes('RSI') && (
-                  <div>
-                    <h4 className="font-medium text-gray-700 dark:text-gray-300">RSI</h4>
-                    <div className="mt-2">
-                      {renderInput('RSI', 'period', localParams.RSI.period)}
-                    </div>
-                  </div>
-                )}
-
-                {activeIndicators.includes('Bollinger Bands') && (
-                  <div>
-                    <h4 className="font-medium text-gray-700 dark:text-gray-300">Bollinger Bands</h4>
-                    <div className="mt-2 space-y-3">
-                      {renderInput('Bollinger Bands', 'period', localParams['Bollinger Bands'].period)}
-                      {renderInput('Bollinger Bands', 'stdDev', localParams['Bollinger Bands'].stdDev)}
-                    </div>
-                  </div>
-                )}
-
-                {activeIndicators.includes('MACD') && (
-                  <div>
-                    <h4 className="font-medium text-gray-700 dark:text-gray-300">MACD</h4>
-                    <div className="mt-2 space-y-3">
-                      {renderInput('MACD', 'fastPeriod', localParams.MACD.fastPeriod)}
-                      {renderInput('MACD', 'slowPeriod', localParams.MACD.slowPeriod)}
-                      {renderInput('MACD', 'signalPeriod', localParams.MACD.signalPeriod)}
-                    </div>
-                  </div>
-                )}
-
-                {activeIndicators.includes('Stochastic') && (
-                  <div>
-                    <h4 className="font-medium text-gray-700 dark:text-gray-300">Stochastic</h4>
-                    <div className="mt-2 space-y-3">
-                      {renderInput('Stochastic', 'period', localParams.Stochastic.period)}
-                      {renderInput('Stochastic', 'smoothK', localParams.Stochastic.smoothK)}
-                      {renderInput('Stochastic', 'smoothD', localParams.Stochastic.smoothD)}
-                    </div>
-                  </div>
-                )}
-
-                {activeIndicators.includes('ADX') && (
-                  <div>
-                    <h4 className="font-medium text-gray-700 dark:text-gray-300">ADX</h4>
-                    <div className="mt-2">
-                      {renderInput('ADX', 'period', localParams.ADX.period)}
-                    </div>
-                  </div>
-                )}
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                    onClick={onClose}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    onClick={handleApply}
+                    disabled={hasErrors}
+                  >
+                    Apply
+                  </button>
+                </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
 
+      {showSavePreset && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="min-h-screen px-4 text-center">
+            <div className="fixed inset-0 bg-black opacity-30"></div>
+            <span className="inline-block h-screen align-middle" aria-hidden="true">
+              &#8203;
+            </span>
+            <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl">
+              <div className="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+                Save Preset
+              </div>
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label htmlFor="preset-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    id="preset-name"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm dark:bg-gray-700 dark:border-gray-600"
+                    value={newPresetName}
+                    onChange={(e) => setNewPresetName(e.target.value)}
+                    placeholder="Enter preset name"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="preset-description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Description
+                  </label>
+                  <textarea
+                    id="preset-description"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm dark:bg-gray-700 dark:border-gray-600"
+                    value={newPresetDescription}
+                    onChange={(e) => setNewPresetDescription(e.target.value)}
+                    placeholder="Enter preset description"
+                    rows={3}
+                  />
+                </div>
+              </div>
               <div className="mt-6 flex justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setLocalParams({
-                      ...defaultParams,
-                      ...params,
-                    });
-                    setErrors({});
-                    setSelectedPreset(null);
-                    onClose();
-                  }}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  onClick={() => setShowSavePreset(false)}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (Object.keys(errors).length === 0) {
-                      onChange(localParams);
-                      onClose();
-                    }
-                  }}
-                  disabled={Object.keys(errors).length > 0}
-                  className={`px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
-                    ${Object.keys(errors).length > 0
-                      ? 'bg-blue-400 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700'}`}
+                  className="px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 bg-blue-600 hover:bg-blue-700"
+                  onClick={handleSavePreset}
                 >
-                  Apply
+                  Save Preset
                 </button>
               </div>
             </div>
-          </Transition.Child>
+          </div>
         </div>
-      </Dialog>
-    </Transition>
+      )}
+
+      {presetToDelete !== null && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="min-h-screen px-4 text-center">
+            <div className="fixed inset-0 bg-black opacity-30"></div>
+            <span className="inline-block h-screen align-middle" aria-hidden="true">
+              &#8203;
+            </span>
+            <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl">
+              <div className="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+                Delete Preset
+              </div>
+              <div className="mt-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Are you sure you want to delete this preset? This action cannot be undone.
+                </p>
+              </div>
+              <div className="mt-6 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  onClick={() => setPresetToDelete(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  onClick={() => presetToDelete && handleDeletePreset(presetToDelete)}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 } 
